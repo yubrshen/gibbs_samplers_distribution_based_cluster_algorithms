@@ -123,6 +123,7 @@ print 'sigma:', sigma
 # Initialize `sampler` and take a single sample
 # (required to initialize the visualization).
 sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
 mu_, z_ = next(sampler)
 
 # Setup visualization ...

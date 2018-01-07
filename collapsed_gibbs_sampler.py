@@ -13,25 +13,33 @@ from time import sleep
 import numpy as np
 from matplotlib import pyplot as plt
 
+
 def initial_z(alpha, N, K, random_state):
     theta = random_state.dirichlet(alpha)
     m = random_state.multinomial(N, theta)
     z = np.repeat(np.arange(K), m)
     random_state.shuffle(z)
     return z
+
 def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
-    zn = [[n for n in range(N) if z[n]==k] for k in range(K)]
-    X_by_component = np.array([X[zn[k]] for k in range(K)])
-    count_by_component = np.array(map(len, X_by_component))
-    sum_by_component = np.array([sum(c) if (0 < len(c)) else np.zeros(D) for c in X_by_component])
-    denominator = count_by_component + sigma/zeta
-    mean_for_mu = sum_by_component/denominator[:, None]
-    var_for_mu =[np.eye(D)*sigma*d for d in denominator]
-    mu = [random_state.multivariate_normal(mean_for_mu[k], var_for_mu[k], size=1)[0] for k in range(K)]
+    count_by_component = []
+    mu = []
+    for k in range(K):
+        X_by_component_k = X[z == k]
+        count_by_component_k = len(X_by_component_k)
+        count_by_component.append(count_by_component_k)
+        sum_by_component_k = (sum(X_by_component_k)
+                              if (0 < len(X_by_component_k))
+                              else np.zeros(D))
+        denominator = count_by_component_k + sigma*sigma/(zeta*zeta)
+        mean_for_mu_k = sum_by_component_k/denominator
+        var_for_mu_k = (sigma*sigma/denominator)*np.eye(D)
+        mu_k = random_state.multivariate_normal(mean_for_mu_k,
+                                                var_for_mu_k, size=1)[0]
+        mu.append(mu_k)
+    return np.array(mu), count_by_component
 
-    return np.array(mu)
-
-def sample_z(z, X, K, D, N, alpha, sigma, zeta, random_state, mu):
+def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
     diff_n_k_squared = np.array([y*y for y in [X-mu[k] for k in range(K)]])
     diff_n_k_sum = np.sum(diff_n_k_squared, axis=2)
     p_xn_k = np.exp(-diff_n_k_sum/(2.0*sigma))/np.power(2.0*np.pi*sigma, D/2.0)
@@ -41,7 +49,7 @@ def sample_z(z, X, K, D, N, alpha, sigma, zeta, random_state, mu):
     w = alpha[:, None] + m_k_exclude_n
     p_tild_xn_k = p_xn_k*w
     p_tild_xn_k_sum_over_k = np.sum(p_tild_xn_k, axis=0)
-    p_tild_xn_k_sum_over_k[p_tild_xn_k_sum_over_k==0] = 1.0
+    p_tild_xn_k_sum_over_k[p_tild_xn_k_sum_over_k == 0] = 1.0
     # no normalization when the denominator is 0.0 to avoid div by 0.0 error
     # If the modeling is correct, the case should not happen
     p_z_n_k = p_tild_xn_k/p_tild_xn_k_sum_over_k
@@ -51,13 +59,13 @@ def sample_z(z, X, K, D, N, alpha, sigma, zeta, random_state, mu):
             z_next.append(random_state.choice(K, p=p_z_n_k[:,n]))
         except ValueError as ex:
             z_next.append(random_state.choice(K, p=None))
-            print("The exception: {}; The offending probabilities: {}; fix it by a guess by random uniform".format(ex, p_z_n_k[:,n]))
-        else: # successful case
+            print("Exception: {}; error probabilities: {}; \
+            fix by random uniform".format(ex, p_z_n_k[:,n]))
+        else:  # successful case
             pass
-            # print("Indeed some correct probabilities: {}".format(p_z_n_k[:,n]))
+            # print("Indeed correct probabilities: {}".format(p_z_n_k[:,n]))
 
-    # z_next = np.array([random_state.choice(K, p=p_z_n_k[:,n]) for n in range(N)])
-    return z_next
+    return np.array(z_next)
 
 def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
     """A collapsed (serial) Gibbs sampler for a Gaussian Mixture Model with known
@@ -89,12 +97,14 @@ def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 
     while True:
         # Sample each `mu`.
-        mu = sample_mu(z, X, K, D, N, sigma, zeta, random_state)
+        mu, _ = sample_mu(z, X, K, D, N, sigma, zeta, random_state)
 
         # Sample each `z`.
-        z = sample_z(z, X, K, D, N, alpha, sigma, zeta, random_state, mu)
+        z = sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta,
+                               mu, random_state)
 
         yield mu, z
+
 # Load sample `X` and proceed with example parameters. (For the purpose of these project, these
 # parameters should be identical to those used to generate the sample.)
 X = np.loadtxt(sys.argv[1] if len(sys.argv) > 1 else 'X.tsv')
@@ -109,6 +119,7 @@ print 'sigma:', sigma
 # Initialize `sampler` and take a single sample
 # (required to initialize the visualization).
 sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
 mu_, z_ = next(sampler)
 
 # Setup visualization ...

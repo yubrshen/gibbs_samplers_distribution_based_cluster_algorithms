@@ -50,9 +50,9 @@ def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
 #+END_SRC
 
 
-** sampling-driver-visualize
+** setup data
 
-#+NAME:sampling-driver-visualize
+#+NAME:setup_data
 #+BEGIN_SRC python :noweb tangle :tangle
 # Load sample `X` and proceed with example parameters. (For the purpose of these project, these
 # parameters should be identical to those used to generate the sample.)
@@ -64,10 +64,12 @@ sigma = 1.0
 print 'alpha:', alpha
 print 'zeta:', zeta
 print 'sigma:', sigma
+#+END_SRC
 
-# Initialize `sampler` and take a single sample
-# (required to initialize the visualization).
-sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+** sample-and-visualize
+
+#+NAME:sample-and-visualize
+#+BEGIN_SRC python :noweb tangle :tangle
 mu_, z_ = next(sampler)
 
 # Setup visualization ...
@@ -128,6 +130,113 @@ from matplotlib import pyplot as plt
 #+END_SRC
 
 * Collapsed Gibbs Sampler
+
+** sample_z_collapsed
+
+#+NAME:sample_z_collapsed
+#+BEGIN_SRC python :noweb tangle :tangle
+def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
+    diff_n_k_squared = np.array([y*y for y in [X-mu[k] for k in range(K)]])
+    diff_n_k_sum = np.sum(diff_n_k_squared, axis=2)
+    p_xn_k = np.exp(-diff_n_k_sum/(2.0*sigma))/np.power(2.0*np.pi*sigma, D/2.0)
+    m_k_exclude_n = np.array([[len(X[[i for i in range(N) if (i != n and i == z[k])]])
+                               for n in range(N)]
+                              for k in range(K)])
+    w = alpha[:, None] + m_k_exclude_n
+    p_tild_xn_k = p_xn_k*w
+    p_tild_xn_k_sum_over_k = np.sum(p_tild_xn_k, axis=0)
+    p_tild_xn_k_sum_over_k[p_tild_xn_k_sum_over_k == 0] = 1.0
+    # no normalization when the denominator is 0.0 to avoid div by 0.0 error
+    # If the modeling is correct, the case should not happen
+    p_z_n_k = p_tild_xn_k/p_tild_xn_k_sum_over_k
+    z_next = []
+    for n in range(N):
+        try:
+            z_next.append(random_state.choice(K, p=p_z_n_k[:,n]))
+        except ValueError as ex:
+            z_next.append(random_state.choice(K, p=None))
+            print("Exception: {}; error probabilities: {}; \
+            fix by random uniform".format(ex, p_z_n_k[:,n]))
+        else:  # successful case
+            pass
+            # print("Indeed correct probabilities: {}".format(p_z_n_k[:,n]))
+
+    return np.array(z_next)
+#+END_SRC
+
+** collapsed_gibbs_sampler
+
+#+NAME:collapsed_gibbs_sampler
+#+BEGIN_SRC python :noweb tangle :tangle
+def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
+    """A collapsed (serial) Gibbs sampler for a Gaussian Mixture Model with known
+      `alpha`,
+      `zeta`
+      and
+      `sigma`."""
+    if random_state is None:
+        random_state = np.random.mtrand._rand
+    elif isinstance(random_state, Integral):
+        random_state = np.random.RandomState(random_state)
+
+    X = np.atleast_2d(X)
+    N, D = X.shape
+
+    alpha = np.atleast_1d(alpha)
+    K, = alpha.shape
+    assert (alpha > 0.0).all()
+
+    assert zeta > 0.0
+    assert sigma > 0.0
+
+    # Initialize `z`.
+    z = initial_z(alpha, N, K, random_state)
+    # z = [np.random.choice(K) for n in range(N)]
+
+    # Allocate `mu`. (This does *not* initialize it.)
+    # mu = np.empty((K, D)) # no longer needed
+
+    while True:
+        # Sample each `mu`.
+        mu, _ = sample_mu(z, X, K, D, N, sigma, zeta, random_state)
+
+        # Sample each `z`.
+        z = sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta,
+                               mu, random_state)
+
+        yield mu, z
+#+END_SRC
+
+** main program
+
+#+NAME:main-collapsed
+#+BEGIN_SRC python :noweb tangle :tangle ./collapsed_gibbs_sampler.py
+##########################################
+# File: collapsed_gibbs_sampler.py       #
+# Copyright Primer Technologies Inc 2017 #
+##########################################
+
+"""Usage: python collapsed_gibbs_sampler.py [input_filename]"""
+
+<<preamble>>
+
+<<initial_z>>
+
+<<sample_mu>>
+
+<<sample_z_collapsed>>
+
+<<collapsed_gibbs_sampler>>
+
+<<setup_data>>
+
+# Initialize `sampler` and take a single sample
+# (required to initialize the visualization).
+sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
+<<sample-and-visualize>>
+#+END_SRC
+
 * Chromatic Gibbs Sampler
 ** sample_theta
 
@@ -236,12 +345,27 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 
 <<chromatic_gibbs_sampler>>
 
-<<sampling-driver-visualize>>
+<<setup_data>>
+
+# Initialize `sampler` and take a single sample
+# (required to initialize the visualization).
+sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
+<<sample-and-visualize>>
 #+END_SRC
+
 
 * Experiments
 
-** Chromatic
+
+** Collapsed Gibbs Sampler
+
+
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 08:15:06
+[[file:Experiments/screenshot_2018-01-07_08-15-06.png]]
+
+** Chromatic Gibbs Sampler
 
 
 #+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 06:17:26
