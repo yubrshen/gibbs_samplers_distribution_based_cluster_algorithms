@@ -46,15 +46,21 @@ def sample_theta(count_by_component, alpha, random_state):
 #+NAME:chromatic_gibbs_sampler
 #+BEGIN_SRC python :noweb tangle :tangle
 def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
-    zn = [[n for n in range(N) if z[n]==k] for k in range(K)]
-    X_by_component = np.array([X[zn[k]] for k in range(K)])
-    count_by_component = np.array(map(len, X_by_component))
-    sum_by_component = np.array([sum(c) if (0 < len(c)) else np.zeros(D) for c in X_by_component])
-    denominator = count_by_component + sigma/zeta
-    mean_for_mu = sum_by_component/denominator[:, None]
-    var_for_mu =[np.eye(D)*sigma*d for d in denominator]
-    mu = [random_state.multivariate_normal(mean_for_mu[k], var_for_mu[k], size=1)[0] for k in range(K)]
-
+    count_by_component = []
+    mu = []
+    for k in range(K):
+        X_by_component_k = X[z == k]
+        count_by_component_k = len(X_by_component_k)
+        count_by_component.append(count_by_component_k)
+        sum_by_component_k = (sum(X_by_component_k)
+                              if (0 < len(X_by_component_k))
+                              else np.zeros(D))
+        denominator = count_by_component_k + sigma*sigma/(zeta*zeta)
+        mean_for_mu_k = sum_by_component_k/denominator
+        var_for_mu_k = (sigma*sigma/denominator)*np.eye(D)
+        mu_k = random_state.multivariate_normal(mean_for_mu_k,
+                                                var_for_mu_k, size=1)[0]
+        mu.append(mu_k)
     return np.array(mu), count_by_component
 
 def sample_z(z, X, K, D, N, alpha, sigma, zeta, mu, theta, random_state):
