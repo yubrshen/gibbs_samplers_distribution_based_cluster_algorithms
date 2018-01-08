@@ -11,13 +11,117 @@
 
 #+TITLE: Implementation of Two Gibbs Samplers
 * Introduction
-* Building Blocks
+
+  This is an exercise to implement collapsed Gibbs samplers and chromatic Gibbs
+  samplers according to specifications defined in[[file:gmm.pdf][Guassian Mixture Model]]
+
+  I present first the module decomposition, software construction (source code), and unit
+  testing. Then I present the experiments with the implementation showing the
+  performance of the samplers.
+
+  I use [[http://www.howardism.org/Technical/Emacs/literate-programming-tutorial.html][Literate Programming]]  to present the software construction. The source
+  code [[file:collapsed_gibbs_sampler.py][collapsed_gibbs_sampler.py]] and[[file:chromatic_gibbs_sampler.py][chromatic_gibbs_sampler.py]] are
+  tangled from the document[[file:gibbs-samplers.org][gibbs-samplers.org]]. From which, this PDF document
+  is also generated.
+* Top Level Program Layouts
+
+  This serves as the architecture description of the programs. I present the top
+  level structure in terms of code blocks of the two programs:
+- collapsed_gibbs_sampler.py
+- chromatic_gibbs_sampler.py
+
+  The referred blocks will be presented in subsequent sections.
+
+** collapsed_gibbs_sampler: main program
+
+   Note, collapsed_gibbs_sampler is instantiated as a generator.
+   It will be used to produces samples.
+
+#+NAME:main-collapsed
+#+BEGIN_SRC python :noweb tangle :tangle ./collapsed_gibbs_sampler.py
+##########################################
+# File: collapsed_gibbs_sampler.py       #
+# Copyright Primer Technologies Inc 2017 #
+##########################################
+
+"""Usage: python collapsed_gibbs_sampler.py [input_filename]"""
+
+<<preamble>>
+
+<<initial_z>>
+
+<<sample_mu>>
+
+<<sample_z_collapsed>>
+
+<<collapsed_gibbs_sampler>>
+
+<<setup_data>>
+
+# Initialize `sampler` and take a single sample
+# (required to initialize the visualization).
+sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
+<<sample-and-visualize>>
+#+END_SRC
+
+** chromatic_gibbs_sampler: main program
+
+   Note, chromatic_gibbs_sampler is instantiated as a generator.
+   It will be used to produces samples.
+
+#+NAME:main-chromatic
+#+BEGIN_SRC python :noweb tangle :tangle ./chromatic_gibbs_sampler.py
+##########################################
+# File: chromatic_gibbs_sampler.py       #
+# Copyright Primer Technologies Inc 2017 #
+##########################################
+
+"""Usage: python chromatic_gibbs_sampler.py [input_filename]"""
+
+<<preamble>>
+
+<<initial_z>>
+
+<<sample_mu>>
+
+<<sample_theta>>
+
+<<sample_z_chromatic>>
+
+<<chromatic_gibbs_sampler>>
+
+<<setup_data>>
+
+# Initialize `sampler` and take a single sample
+# (required to initialize the visualization).
+sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+
+<<sample-and-visualize>>
+#+END_SRC
+
+* Common Building Blocks
+
+  This section presents the common building blocks between the two programs.
+  The blocks are used in the construction of the programs as outlined in the
+  sections of "Top Level Program Layouts".
 
 ** initial_z
 
 #+NAME:initial_z
 #+BEGIN_SRC python :noweb tangle :tangle
 def initial_z(alpha, N, K, random_state):
+    """
+    Initialize z (component assignments)
+    required to boostrap the gibbs sampling.
+    alpha: the seed vector for Dirchlet sampling of the component proportions.
+    N: the number of data points to which
+    the sampling of component means and component assignments are performed.
+    K: the assumed number of components in the data to be sampled.
+    random_state: the random state used as consistent context for random sampling.
+
+    It returns the computed z.
+    """
     theta = random_state.dirichlet(alpha)
     m = random_state.multinomial(N, theta)
     z = np.repeat(np.arange(K), m)
@@ -31,6 +135,26 @@ def initial_z(alpha, N, K, random_state):
 #+NAME:sample_mu
 #+BEGIN_SRC python :noweb tangle :tangle
 def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
+    """
+    Perform the sampling of mu (the component means) in gibbs sample procedure.
+    z: the component assignments prior or computed
+    in the previous sampling iteration.
+    X: the dataset of the data points to be sampled for
+    component means and component assignments.
+    K: the assumed number of components in the data to be sampled.
+    D: the number of attributes of a data points in X.
+    N: the number of data points in X to which
+    the sampling of component means and component assignments are performed.
+    sigma: the standard deviation of the noise to the data points
+    zeta: the standard deviation for the Gaussian prior
+    over the component means
+    random_state: the random state used as consistent context
+    for random sampling.
+
+    It returns both the updated mu as numpy array and count_by_component,
+    a list of counts of components in X according to z.
+
+    """
     count_by_component = []
     mu = []
     for k in range(K):
@@ -52,6 +176,11 @@ def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
 
 ** setup data
 
+   This segment of code read in the data points in X to be sampled.
+   It also sets up the parameters, alpha, zeta, and sigma.
+   For the programs to properly sample, the parameters should be
+   consistent to how X was generated.
+
 #+NAME:setup_data
 #+BEGIN_SRC python :noweb tangle :tangle
 # Load sample `X` and proceed with example parameters. (For the purpose of these project, these
@@ -67,6 +196,12 @@ print 'sigma:', sigma
 #+END_SRC
 
 ** sample-and-visualize
+
+   This segment of the code gets next samples (mu, z) from the sampler and
+   plots mu, and the data points in X according to the component assignments
+   in z with different colors.
+
+   It performs the above procedure forever, until aborted by external signal.
 
 #+NAME:sample-and-visualize
 #+BEGIN_SRC python :noweb tangle :tangle
@@ -117,6 +252,8 @@ for n in count(1):
 
 ** preamble
 
+   The imports.
+
 #+NAME:preamble
 #+BEGIN_SRC python :noweb tangle :tangle
 import sys
@@ -131,11 +268,34 @@ from matplotlib import pyplot as plt
 
 * Collapsed Gibbs Sampler
 
+  Here are the functions special for collapsed gibbs sampler.
+
 ** sample_z_collapsed
 
 #+NAME:sample_z_collapsed
 #+BEGIN_SRC python :noweb tangle :tangle
 def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
+    """
+    Perform the sampling of z (the component assignments)
+    in collapsed gibbs sample procedure.
+    z: the component assignments from the previous sampling iteration.
+    X: the dataset of the data points to be sampled for
+    component means and component assignments.
+    K: the assumed number of components in the data to be sampled.
+    D: the number of attributes of a data points in X.
+    N: the number of data points in X to which
+    the sampling of component means and component assignments are performed.
+    alpha: the seed vector for Dirchlet sampling of the component proportions.
+    sigma: the standard deviation of the noise to the data points
+    zeta: the standard deviation for the Gaussian prior
+    over the component means.
+    mu: the component means.
+    random_state: the random state used as consistent context
+    for random sampling.
+
+    It returns the updated z as numpy array.
+    """
+
     diff_n_k_squared = np.array([y*y for y in [X-mu[k] for k in range(K)]])
     diff_n_k_sum = np.sum(diff_n_k_squared, axis=2)
     p_xn_k = np.exp(-diff_n_k_sum/(2.0*sigma))/np.power(2.0*np.pi*sigma, D/2.0)
@@ -207,42 +367,27 @@ def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
         yield mu, z
 #+END_SRC
 
-** main program
-
-#+NAME:main-collapsed
-#+BEGIN_SRC python :noweb tangle :tangle ./collapsed_gibbs_sampler.py
-##########################################
-# File: collapsed_gibbs_sampler.py       #
-# Copyright Primer Technologies Inc 2017 #
-##########################################
-
-"""Usage: python collapsed_gibbs_sampler.py [input_filename]"""
-
-<<preamble>>
-
-<<initial_z>>
-
-<<sample_mu>>
-
-<<sample_z_collapsed>>
-
-<<collapsed_gibbs_sampler>>
-
-<<setup_data>>
-
-# Initialize `sampler` and take a single sample
-# (required to initialize the visualization).
-sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
-
-<<sample-and-visualize>>
-#+END_SRC
-
 * Chromatic Gibbs Sampler
+
+  Here are the functions special for chromatic gibbs sampler.
+
 ** sample_theta
 
 #+NAME:sample_theta
 #+BEGIN_SRC python :noweb tangle :tangle
 def sample_theta(count_by_component, alpha, random_state):
+    """
+    Perform the sampling of theta (the component proportions)
+    in chromatic gibbs sample procedure.
+    count_by_component: a list of counts of components in data points
+    according to z.
+    alpha: the seed vector for Dirchlet sampling of the component proportions.
+    random_state: the random state used as consistent context
+    for random sampling.
+
+    It returns the updated theta.
+    """
+
     gamma = alpha + count_by_component
     theta = random_state.dirichlet(gamma)
     return theta
@@ -253,6 +398,29 @@ def sample_theta(count_by_component, alpha, random_state):
 #+NAME:sample_z_chromatic
 #+BEGIN_SRC python :noweb tangle :tangle
 def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta, random_state):
+    """
+    Perform the sampling of z (the component assignments)
+    in chromatic gibbs sample procedure.
+    z: the component assignments from the previous sampling iteration.
+    X: the dataset of the data points to be sampled for
+    component means and component assignments.
+    K: the assumed number of components in the data to be sampled.
+    D: the number of attributes of a data points in X.
+    N: the number of data points in X to which
+    the sampling of component means and component assignments are performed.
+    alpha: the seed vector for Dirchlet sampling of the component proportions.
+    sigma: the standard deviation of the noise to the data points
+    zeta: the standard deviation for the Gaussian prior
+    over the component means.
+    mu: the component means.
+    theta: the sampled theta (component proportions)
+    from the previous iteration.
+    random_state: the random state used as consistent context
+    for random sampling.
+
+    It returns the updated z as numpy array.
+    """
+
     diff_n_k_squared = np.array([y*y for y in [X-mu[k] for k in range(K)]])
     diff_n_k_sum = np.sum(diff_n_k_squared, axis=2)
     p_xn_k = np.exp(-diff_n_k_sum/(2.0*sigma))/np.power(2.0*np.pi*sigma, D/2.0)
@@ -322,50 +490,30 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
         yield mu, z
 #+END_SRC
 
-** main program
-
-#+NAME:main-chromatic
-#+BEGIN_SRC python :noweb tangle :tangle ./chromatic_gibbs_sampler.py
-##########################################
-# File: chromatic_gibbs_sampler.py       #
-# Copyright Primer Technologies Inc 2017 #
-##########################################
-
-"""Usage: python chromatic_gibbs_sampler.py [input_filename]"""
-
-<<preamble>>
-
-<<initial_z>>
-
-<<sample_mu>>
-
-<<sample_theta>>
-
-<<sample_z_chromatic>>
-
-<<chromatic_gibbs_sampler>>
-
-<<setup_data>>
-
-# Initialize `sampler` and take a single sample
-# (required to initialize the visualization).
-sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
-
-<<sample-and-visualize>>
-#+END_SRC
-
-
 * Experiments
-
 
 ** Collapsed Gibbs Sampler
 
-
+   The diagram on the right is from the collapsed gibbs sampler's
+   sampling. The diagram on the left is the original data points with
+   the means and component partitions.
+   By examining the updated means of the components, and the
+   component assignments illustrated by the different colors,
+   and comparing that of the original, it seems that the sampler
+   succeeded in sampling the means of the components and their assignments.
 
 #+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 08:15:06
 [[file:Experiments/screenshot_2018-01-07_08-15-06.png]]
 
 ** Chromatic Gibbs Sampler
+
+   The diagram on the right is from the chromatic gibbs sampler's
+   sampling. The diagram on the left is the original data points with
+   the means and component partitions.
+   By examining the updated means of the components, and the
+   component assignments illustrated by the different colors,
+   and comparing that of the original, it seems that the sampler
+   succeeded in sampling the means of the components and their assignments.
 
 
 #+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 06:17:26
