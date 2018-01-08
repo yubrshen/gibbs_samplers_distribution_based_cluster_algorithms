@@ -81,8 +81,8 @@ mu, theta, z, X = sample_gmm(alpha, zeta, sigma, D, N, random_state=random_state
 # Write `X` ...
 print '-> X.tsv (X.shape: {})'.format(X.shape)
 np.savetxt('X.tsv', X, delimiter='\t')
-
-
+np.savetxt('mu.tsv', mu, delimiter='\t')
+np.savetxt('z.tsv', z, delimiter='\t')
 
 # ... and visualize.
 fig, ax = plt.subplots()
@@ -93,7 +93,8 @@ prop_cycle = cycle(plt.rcParams['axes.prop_cycle'])
 
 for k, (x, y) in enumerate(mu):
     p = next(prop_cycle)
-    ax.plot(x, y, 'o', ms=8, mew=2.0, zorder=2.1, color=p['color'])
+    ax.plot(x, y, 'o', ms=8, mew=2.0, zorder=2.1, color=p['color'],
+            marker=(3+k, 0, 0))
 
     x, y = X[z == k].T
     ax.plot(x, y, '.', color=p['color'])
