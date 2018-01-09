@@ -1,6 +1,6 @@
 #+LATEX_CLASS: article
 #+LATEX_CLASS_OPTIONS:
-#+LATEX_HEADER:
+#+LATEX_HEADER: \usepackage{placeins}
 #+LATEX_HEADER_EXTRA:
 #+DESCRIPTION:
 #+KEYWORDS:
@@ -31,7 +31,7 @@
 - chromatic_gibbs_sampler.py
 
   The referred blocks will be presented in subsequent sections.
-
+\clearpage
 ** collapsed_gibbs_sampler: main program
 
    Note, collapsed_gibbs_sampler is instantiated as a generator.
@@ -70,6 +70,7 @@ if __name__ == '__main__':
 
 #+END_SRC
 
+\clearpage
 ** chromatic_gibbs_sampler: main program
 
    Note, chromatic_gibbs_sampler is instantiated as a generator.
@@ -109,6 +110,8 @@ if __name__ == '__main__':
     main()
  #+END_SRC
 
+
+\clearpage
 * Common Building Blocks
 
   This section presents the common building blocks between the two programs.
@@ -140,6 +143,7 @@ def initial_z(alpha, N, K, random_state):
 #+END_SRC
 
 
+\clearpage
 ** sample_mu
 
 #+NAME:sample_mu
@@ -288,7 +292,7 @@ finally:
 
 *** collect-errors
 
-Executed in the context of sampling and visualization:
+Executed in the context of sampling and visualization, to accumulate the error data:
 #+NAME:collect-errors
 #+BEGIN_SRC python :noweb yes :tangle
 mu_distances, sum_mu_distances, z_errors, z_error_total \
@@ -304,7 +308,8 @@ z_err_total_acc.append(z_error_total)
 
 *** plot-errors
 
-Executed in the context of try-finally of sampling and visualization:
+Executed in the context of exception catch clause of sampling and
+visualization, to plot the error data into curves:
 #+NAME:plot-errors
 #+BEGIN_SRC python :noweb yes :tangle
 plt.subplot(2, 1, 1)
@@ -396,6 +401,7 @@ def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
     return np.array(z_next)
 #+END_SRC
 
+\clearpage
 ** collapsed_gibbs_sampler
 
 #+NAME:collapsed_gibbs_sampler
@@ -439,6 +445,9 @@ def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
         yield mu, z
 #+END_SRC
 
+
+\clearpage
+
 * Chromatic Gibbs Sampler
 
   Here are the functions special for chromatic gibbs sampler.
@@ -464,6 +473,8 @@ def sample_theta(count_by_component, alpha, random_state):
     theta = random_state.dirichlet(gamma)
     return theta
 #+END_SRC
+
+\clearpage
 
 ** sample_z_chromatic
 
@@ -518,6 +529,8 @@ def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta,
             # print("Indeed correct probabilities: {}".format(p_z_n_k[:,n]))
     return np.array(z_next)
 #+END_SRC
+\clearpage
+
 ** chromatic_gibbs_sampler
 
 #+NAME:chromatic_gibbs_sampler
@@ -563,7 +576,25 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
         yield mu, z
 #+END_SRC
 
+\clearpage
+
 * Experiments
+
+  Experiments are performed by executing the following commands:
+
+  #+NAME:
+  #+BEGIN_SRC shell
+  python collapsed_gibbs_sampler.py
+  #+END_SRC
+
+and
+
+#+NAME:
+#+BEGIN_SRC shell
+python chromatic_gibbs_sampler.py
+#+END_SRC
+
+The figures are manually saved from those displayed by the above programs.
 
 ** Visual Examination
 
@@ -579,6 +610,10 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
   One key observation is that the labels of the components may not be the same
   as those originally generated in the data as the shape of the markers do not
   align from the original and the sampled.
+
+  We also observed that it only takes less than 100 iterations for both samplers
+  to converge on the sampling.
+
 #+CAPTION: Original Mixture
 #+NAME: fig.original
 [[file:sample_gmm.png]]
@@ -590,6 +625,8 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 #+NAME: fig.chromatic
 [[file:chromatic.png]]
 
+\FloatBarrier
+
 ** Quantified Error Analysis
 
 Here we measure the extent how the samplers correctly sampled the
@@ -600,6 +637,8 @@ component means and component assignments.
 #+CAPTION: Errors of Chromatic Gibbs Sampler
 #+NAME: fig.chromatic-error
 [[file:chromatic-error-curves.png]]
+
+\FloatBarrier
 
 It seems that the errors are rapidly reduced and remain relatively flat.
 
@@ -625,6 +664,7 @@ The following diagram illustrates the idea.
 #+CAPTION: Alignment of means (the original and the sampled)
 #+NAME: fig.allignment
 [[file:mean-points-alignment.jpg]]
+\FloatBarrier
 
 **** index_alignment
 
@@ -737,3 +777,15 @@ def z_errors_f(K, z_aligned, z_original):
                           for x in z_original_component_counts]),
        sum(z_errors)/len(z_aligned))
 #+END_SRC
+
+
+
+* Further Considerations
+
+  There may need more unit testing of the implementation of the gibbs samplers.
+  Very often, human errors in programming may cause errors in the computations.
+  It's difficult to validate on the random sampling operations themselves. But
+  it is possible to validate or sanitize on the implementation of the
+  mathematical equations that have deterministic outcome.
+
+  This will be left for further improvement, when there is more time.
