@@ -56,13 +56,18 @@
 
 <<collapsed_gibbs_sampler>>
 
-<<setup_data>>
+def main():
+    <<setup_data>>
 
-# Initialize `sampler` and take a single sample
-# (required to initialize the visualization).
-sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+    # Initialize `sampler` and take a single sample
+    # (required to initialize the visualization).
+    sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
 
-<<sample-and-visualize>>
+    <<sample-and-visualize>>
+
+if __name__ == '__main__':
+    main()
+
 #+END_SRC
 
 ** chromatic_gibbs_sampler: main program
@@ -91,14 +96,18 @@ sampler = collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
 
 <<chromatic_gibbs_sampler>>
 
-<<setup_data>>
+def main():
+    <<setup_data>>
 
-# Initialize `sampler` and take a single sample
-# (required to initialize the visualization).
-sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
+    # Initialize `sampler` and take a single sample
+    # (required to initialize the visualization).
+    sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
 
-<<sample-and-visualize>>
-#+END_SRC
+    <<sample-and-visualize>>
+
+if __name__ == '__main__':
+    main()
+ #+END_SRC
 
 * Common Building Blocks
 
@@ -109,7 +118,7 @@ sampler = chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=0)
 ** initial_z
 
 #+NAME:initial_z
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def initial_z(alpha, N, K, random_state):
     """
     Initialize z (component assignments)
@@ -118,7 +127,8 @@ def initial_z(alpha, N, K, random_state):
     N: the number of data points to which
     the sampling of component means and component assignments are performed.
     K: the assumed number of components in the data to be sampled.
-    random_state: the random state used as consistent context for random sampling.
+    random_state: the random state used as consistent context
+    for random sampling.
 
     It returns the computed z.
     """
@@ -133,7 +143,7 @@ def initial_z(alpha, N, K, random_state):
 ** sample_mu
 
 #+NAME:sample_mu
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
     """
     Perform the sampling of mu (the component means) in gibbs sample procedure.
@@ -182,9 +192,11 @@ def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
    consistent to how X was generated.
 
 #+NAME:setup_data
-#+BEGIN_SRC python :noweb tangle :tangle
-# Load sample `X` and proceed with example parameters. (For the purpose of these project, these
-# parameters should be identical to those used to generate the sample.)
+#+BEGIN_SRC python :noweb yes :tangle
+# Load sample `X` and proceed with example parameters.
+# (For the purpose of these project, these parameters should be identical
+# to those used to generate the sample.)
+
 X = np.loadtxt(sys.argv[1] if len(sys.argv) > 1 else 'X.tsv')
 
 alpha = [1.0, 1.0, 1.0]
@@ -201,10 +213,25 @@ print 'sigma:', sigma
    plots mu, and the data points in X according to the component assignments
    in z with different colors.
 
+   The markers of the means of the components show the labels of the means of
+   the components as polygons. The number of sides of the polygons equals to
+   $k+3$ where $k$ is the label to a component.
+
    It performs the above procedure forever, until aborted by external signal.
 
 #+NAME:sample-and-visualize
 #+BEGIN_SRC python :noweb tangle :tangle
+<<index_alignment>>
+
+<<errors-f>>
+
+mu_original = np.loadtxt('./mu.tsv')
+z_original = np.loadtxt('./z.tsv')
+mu_dist_acc = np.empty(shape=[3, 0])
+mu_dist_total_acc = []
+z_err_acc = np.empty(shape=[3, 0])
+z_err_total_acc = []
+
 mu_, z_ = next(sampler)
 
 # Setup visualization ...
@@ -220,42 +247,87 @@ prop_cycle = cycle(plt.rcParams['axes.prop_cycle'])
 mu_lines, X_lines = [], []
 for k, (x, y) in enumerate(mu_):
     p = next(prop_cycle)
-    mu_lines.extend(ax.plot(x, y, 'o', ms=8, mew=2.0, zorder=2.1, color=p['color']))
+    mu_lines.extend(ax.plot(x, y, 'o', ms=8, mew=2.0, zorder=2.1,
+                            color=p['color'], marker=(3+k, 0, 0)))
 
     x, y = X[z_ == k].T
     X_lines.extend(ax.plot(x, y, '.', color=p['color']))
 
-# ... and sample forever.
-for n in count(1):
-    sys.stdout.write('\rSamples: %d ... ' % n)
-    sys.stdout.flush()
+try:
+    # ... and sample forever.
+    for n in count(1):
+        sys.stdout.write('\rSamples: %d ... ' % n)
+        sys.stdout.flush()
 
-    sleep(0.02)
+        sleep(0.02)
 
-    mu_, z_ = next(sampler)
-    for k, ((x, y), mu_line, X_line) in enumerate(zip(mu_, mu_lines, X_lines)):
-        mu_line.set_xdata(x)
-        mu_line.set_ydata(y)
+        mu_, z_ = next(sampler)
 
-        x, y = X[z_ == k].T
-        X_line.set_xdata(x)
-        X_line.set_ydata(y)
+        <<collect-errors>>
 
-    fig.canvas.draw()
+        for k, ((x, y), mu_line, X_line) in enumerate(
+                zip(mu_, mu_lines, X_lines)):
+            mu_line.set_xdata(x)
+            mu_line.set_ydata(y)
 
-    # This call helps the plot update continuously on some systems. See:
-    # http://stackoverflow.com/a/19119738/3561
-    plt.pause(0.1)
+            x, y = X[z_ == k].T
+            X_line.set_xdata(x)
+            X_line.set_ydata(y)
 
+        fig.canvas.draw()
+
+        # This call helps the plot update continuously on some systems. See:
+        # http://stackoverflow.com/a/19119738/3561
+        plt.pause(0.1)
+except KeyboardInterrupt as ex:
+    <<plot-errors>>
+    raise(ex)
+finally:
+    pass
 #+END_SRC
 
+*** collect-errors
+
+Executed in the context of sampling and visualization:
+#+NAME:collect-errors
+#+BEGIN_SRC python :noweb yes :tangle
+mu_distances, sum_mu_distances, z_errors, z_error_total \
+    = errors_f(mu_, mu_original, z_, z_original)
+
+mu_dist_acc = np.append(mu_dist_acc,
+                        np.reshape(mu_distances, [3, 1]), axis=1)
+mu_dist_total_acc.append(sum_mu_distances)
+z_err_acc = np.append(z_err_acc,
+                      np.reshape(z_errors, [3, 1]), axis=1)
+z_err_total_acc.append(z_error_total)
+#+END_SRC
+
+*** plot-errors
+
+Executed in the context of try-finally of sampling and visualization:
+#+NAME:plot-errors
+#+BEGIN_SRC python :noweb yes :tangle
+plt.subplot(2, 1, 1)
+for i in range(mu_dist_acc.shape[0]):
+    plt.plot(mu_dist_acc[i], marker=(3+i, 0, 0))
+plt.plot(mu_dist_total_acc)
+plt.ylabel('Error Distances of Means')
+
+plt.subplot(2, 1, 2)
+for i in range(z_err_acc.shape[0]):
+    plt.plot(z_err_acc[i], marker=(3+i, 0, 0))
+plt.plot(z_err_total_acc)
+plt.ylabel('Error Component Assignments')
+plt.show()
+plt.pause(100)
+#+END_SRC
 
 ** preamble
 
    The imports.
 
 #+NAME:preamble
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 import sys
 from itertools import count, cycle
 from numbers import Integral
@@ -273,7 +345,7 @@ from matplotlib import pyplot as plt
 ** sample_z_collapsed
 
 #+NAME:sample_z_collapsed
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
     """
     Perform the sampling of z (the component assignments)
@@ -327,7 +399,7 @@ def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
 ** collapsed_gibbs_sampler
 
 #+NAME:collapsed_gibbs_sampler
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
     """A collapsed (serial) Gibbs sampler for a Gaussian Mixture Model with known
       `alpha`,
@@ -374,7 +446,7 @@ def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 ** sample_theta
 
 #+NAME:sample_theta
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def sample_theta(count_by_component, alpha, random_state):
     """
     Perform the sampling of theta (the component proportions)
@@ -396,8 +468,9 @@ def sample_theta(count_by_component, alpha, random_state):
 ** sample_z_chromatic
 
 #+NAME:sample_z_chromatic
-#+BEGIN_SRC python :noweb tangle :tangle
-def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta, random_state):
+#+BEGIN_SRC python :noweb yes :tangle
+def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta,
+                     random_state):
     """
     Perform the sampling of z (the component assignments)
     in chromatic gibbs sample procedure.
@@ -448,7 +521,7 @@ def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta, random_stat
 ** chromatic_gibbs_sampler
 
 #+NAME:chromatic_gibbs_sampler
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb yes :tangle
 def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
     """A chromatic Gibbs sampler for a Gaussian Mixture Model with known
     `alpha`,
@@ -492,29 +565,175 @@ def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 
 * Experiments
 
-** Collapsed Gibbs Sampler
+** Visual Examination
 
-   The diagram on the right is from the collapsed gibbs sampler's
-   sampling. The diagram on the left is the original data points with
+  The diagrams below show the sampling of collapsed gibbs sampler and chromatic
+   gibbs sampler. The diagram on the top is the original data points with
    the means and component partitions.
+
    By examining the updated means of the components, and the
    component assignments illustrated by the different colors,
-   and comparing that of the original, it seems that the sampler
+   and comparing that of the original, it seems that both samplers
    succeeded in sampling the means of the components and their assignments.
 
-#+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 08:15:06
-[[file:Experiments/screenshot_2018-01-07_08-15-06.png]]
+  One key observation is that the labels of the components may not be the same
+  as those originally generated in the data as the shape of the markers do not
+  align from the original and the sampled.
+#+CAPTION: Original Mixture
+#+NAME: fig.original
+[[file:sample_gmm.png]]
 
-** Chromatic Gibbs Sampler
+#+CAPTION: Samples from Collapsed Gibbs Sampler
+#+NAME: fig.collapsed
+[[./collapsed.png]]
+#+CAPTION: Samples from Chromatic Gibbs Sampler
+#+NAME: fig.chromatic
+[[file:chromatic.png]]
 
-   The diagram on the right is from the chromatic gibbs sampler's
-   sampling. The diagram on the left is the original data points with
-   the means and component partitions.
-   By examining the updated means of the components, and the
-   component assignments illustrated by the different colors,
-   and comparing that of the original, it seems that the sampler
-   succeeded in sampling the means of the components and their assignments.
+** Quantified Error Analysis
+
+Here we measure the extent how the samplers correctly sampled the
+component means and component assignments.
+#+CAPTION: Errors of Collapsed Gibbs Sampler
+#+NAME: fig.collapsed-error
+[[file:collapsed-error-curves.png]]
+#+CAPTION: Errors of Chromatic Gibbs Sampler
+#+NAME: fig.chromatic-error
+[[file:chromatic-error-curves.png]]
+
+It seems that the errors are rapidly reduced and remain relatively flat.
+
+The following of the source code for error analysis.
+
+*** Alignment of Component Indices
+
+First of all, as the component index $k$ has no functional bearing in the
+sampling outcome, as the prior statistics for the components are all identical
+to across the components. Therefore, even the samplers can discriminate the
+components, but the index of the components may not be necessarily the same as
+those used in the original data. It has been confirmed in the figures above.
+
+Hence, we need to align the index of components between the original and the
+sampled so that we can perform correctness analysis.
+
+The alignment problem can be characterized as follows:
+
+Given two sets of mean points (the original, and the sampled), pair between the
+original and the sampled so that the mean points in each pair is the closest.
+
+The following diagram illustrates the idea.
+#+CAPTION: Alignment of means (the original and the sampled)
+#+NAME: fig.allignment
+[[file:mean-points-alignment.jpg]]
+
+**** index_alignment
+
+     Here is the code for index_alignment with test driven approach of unit
+     testing.
+
+#+NAME:index_alignment
+#+BEGIN_SRC python :noweb yes :tangle
+original = [[0, 1],
+            [1, 1],
+            [1, 0]]
+
+sampled = [[0.9, 0.7],
+           [0.3, 0.5],
+           [0.6, 0.1]]
+
+# from the indices of sampled to those of the original
+expected_map = {0:1,
+                1:0,
+                2:2}
+
+def index_alignment(sampled, original):
+    """
+    map the indices of the sampled to those of the original
+    so that the data points of the mapped pair are the closest in distance.
+
+    sampled: a list of data points sampled.
+    original: a list of data points original
+
+    The length of sampled and original should be equal.
+
+    return a map of index from that of the sampled to that of the original
+    """
+    assert(len(sampled) == len(original))
+    len_sampled = len(sampled)
+    len_original = len(original)
+    sampled = np.array(sampled)
+    original = np.array(original)
+    available = np.full(len_original, True)
+    # indices whether the data point has been mathched
+
+    result = {}
+    mu_distances = []
+    for i in range(0, len_sampled):
+        least = -1
+        for j in range(0, len_original):
+            if available[j]:     # not yet matched
+                diff = sampled[i]-original[j]
+                inner_diff = np.inner(diff, diff)
+                if (least < 0) or (inner_diff < least):
+                    least = inner_diff
+                    idx_least = j
+                # end of if (least < 0) or (inner_diff < least)
+            # end of if available[j] == 0
+        # end of for j in range(idx_original, len_original)
+        result[i] = idx_least
+        mu_distances.append(np.sqrt(least))
+        available[idx_least] = False
+    # end of for i in range(idx_sampled, len_sampled)
+    # reorder the distance from the perspective of the original:
+    mu_distances_reordered = [None] * len(original)
+    for i in range(len(original)):
+        mu_distances_reordered[result[i]] = mu_distances[i]
+    return result, mu_distances_reordered
 
 
-#+DOWNLOADED: /tmp/screenshot.png @ 2018-01-07 06:17:26
-[[file:Experiments/screenshot_2018-01-07_06-17-26.png]]
+assert(index_alignment(sampled, original)[0] == expected_map)
+#+END_SRC
+
+*** Compute the Errors
+
+    For sampling iteration, consider the following error quantification:
+- Errors of Means::
+  For each component, the distance between the original mean and the sampled.
+  Also consider the sum of the error distances across all components.
+
+
+- Errors of Component Assignments::
+  For each components, the number of wrong assignments. Also consider the sum of
+  the wrong assignments for all components.
+
+Given the sampled means in mu, the component assignments in z, and mu_original,
+and z_original for the corresponding original respectively.
+
+**** errors-f
+
+#+NAME:errors-f
+#+BEGIN_SRC python :noweb yes :tangle
+<<z_errors_f>>
+
+def errors_f(mu, mu_original, z, z_original):
+    index_map, mu_distances = index_alignment(mu, mu_original)
+
+    z_aligned = map(lambda i: index_map[i], z)
+
+    z_errors, z_error_total = z_errors_f(len(original), z_aligned, z_original)
+    return mu_distances, sum(mu_distances), z_errors, z_error_total
+#+END_SRC
+
+#+NAME:z_errors_f
+#+BEGIN_SRC python :noweb yes :tangle
+def z_errors_f(K, z_aligned, z_original):
+    z_errors = np.zeros(K)
+    for i in range(len(z_aligned)):
+        if z_original[i] != z_aligned[i]:
+            z_errors[int(z_original[i])] += 1
+    z_original_component_counts \
+        = map(len, [z_original[z_original == k] for k in range(K)])
+    return (z_errors/np.array([x if x != 0 else 1
+                          for x in z_original_component_counts]),
+       sum(z_errors)/len(z_aligned))
+#+END_SRC
