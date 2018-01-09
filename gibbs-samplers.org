@@ -38,7 +38,7 @@
    It will be used to produces samples.
 
 #+NAME:main-collapsed
-#+BEGIN_SRC python :noweb tangle :tangle ./collapsed_gibbs_sampler.py
+#+BEGIN_SRC python :noweb no-export :tangle ./collapsed_gibbs_sampler.py
 ##########################################
 # File: collapsed_gibbs_sampler.py       #
 # Copyright Primer Technologies Inc 2017 #
@@ -77,7 +77,7 @@ if __name__ == '__main__':
    It will be used to produces samples.
 
 #+NAME:main-chromatic
-#+BEGIN_SRC python :noweb tangle :tangle ./chromatic_gibbs_sampler.py
+#+BEGIN_SRC python :noweb no-export :tangle ./chromatic_gibbs_sampler.py
 ##########################################
 # File: chromatic_gibbs_sampler.py       #
 # Copyright Primer Technologies Inc 2017 #
@@ -121,7 +121,7 @@ if __name__ == '__main__':
 ** initial_z
 
 #+NAME:initial_z
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def initial_z(alpha, N, K, random_state):
     """
     Initialize z (component assignments)
@@ -147,7 +147,7 @@ def initial_z(alpha, N, K, random_state):
 ** sample_mu
 
 #+NAME:sample_mu
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
     """
     Perform the sampling of mu (the component means) in gibbs sample procedure.
@@ -196,7 +196,7 @@ def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
    consistent to how X was generated.
 
 #+NAME:setup_data
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 # Load sample `X` and proceed with example parameters.
 # (For the purpose of these project, these parameters should be identical
 # to those used to generate the sample.)
@@ -224,7 +224,7 @@ print 'sigma:', sigma
    It performs the above procedure forever, until aborted by external signal.
 
 #+NAME:sample-and-visualize
-#+BEGIN_SRC python :noweb tangle :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 <<index_alignment>>
 
 <<errors-f>>
@@ -294,7 +294,7 @@ finally:
 
 Executed in the context of sampling and visualization, to accumulate the error data:
 #+NAME:collect-errors
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 mu_distances, sum_mu_distances, z_errors, z_error_total \
     = errors_f(mu_, mu_original, z_, z_original)
 
@@ -311,7 +311,7 @@ z_err_total_acc.append(z_error_total)
 Executed in the context of exception catch clause of sampling and
 visualization, to plot the error data into curves:
 #+NAME:plot-errors
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 plt.subplot(2, 1, 1)
 for i in range(mu_dist_acc.shape[0]):
     plt.plot(mu_dist_acc[i], marker=(3+i, 0, 0))
@@ -332,7 +332,7 @@ plt.pause(100)
    The imports.
 
 #+NAME:preamble
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 import sys
 from itertools import count, cycle
 from numbers import Integral
@@ -350,7 +350,7 @@ from matplotlib import pyplot as plt
 ** sample_z_collapsed
 
 #+NAME:sample_z_collapsed
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
     """
     Perform the sampling of z (the component assignments)
@@ -405,7 +405,7 @@ def sample_z_collapsed(z, X, K, D, N, alpha, sigma, zeta, mu, random_state):
 ** collapsed_gibbs_sampler
 
 #+NAME:collapsed_gibbs_sampler
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
     """A collapsed (serial) Gibbs sampler for a Gaussian Mixture Model with known
       `alpha`,
@@ -455,7 +455,7 @@ def collapsed_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
 ** sample_theta
 
 #+NAME:sample_theta
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def sample_theta(count_by_component, alpha, random_state):
     """
     Perform the sampling of theta (the component proportions)
@@ -479,7 +479,7 @@ def sample_theta(count_by_component, alpha, random_state):
 ** sample_z_chromatic
 
 #+NAME:sample_z_chromatic
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta,
                      random_state):
     """
@@ -534,7 +534,7 @@ def sample_z_chromatic(z, X, K, D, N, alpha, sigma, zeta, mu, theta,
 ** chromatic_gibbs_sampler
 
 #+NAME:chromatic_gibbs_sampler
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def chromatic_gibbs_sampler(X, alpha, zeta, sigma, random_state=None):
     """A chromatic Gibbs sampler for a Gaussian Mixture Model with known
     `alpha`,
@@ -672,7 +672,7 @@ The following diagram illustrates the idea.
      testing.
 
 #+NAME:index_alignment
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 original = [[0, 1],
             [1, 1],
             [1, 0]]
@@ -752,7 +752,7 @@ and z_original for the corresponding original respectively.
 **** errors-f
 
 #+NAME:errors-f
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 <<z_errors_f>>
 
 def errors_f(mu, mu_original, z, z_original):
@@ -765,7 +765,7 @@ def errors_f(mu, mu_original, z, z_original):
 #+END_SRC
 
 #+NAME:z_errors_f
-#+BEGIN_SRC python :noweb yes :tangle
+#+BEGIN_SRC python :noweb no-export :tangle
 def z_errors_f(K, z_aligned, z_original):
     z_errors = np.zeros(K)
     for i in range(len(z_aligned)):
