@@ -10,8 +10,8 @@
 #+OPTIONS: ^:nil
 
 #+TITLE: Implementation of Two Gibbs Samplers
-* Introduction
 
+* Introduction
   This is an exercise to implement collapsed Gibbs samplers and chromatic Gibbs
   samplers according to specifications defined in[[file:gmm.pdf][Guassian Mixture Model]]
 
@@ -186,6 +186,110 @@ def sample_mu(z, X, K, D, N, sigma, zeta, random_state):
         mu.append(mu_k)
     return np.array(mu), count_by_component
 #+END_SRC
+
+\clearpage
+** component distribution probabilities
+
+   For sampling of component assignment, $z_n$, the following conditional
+   probabilities need to be calculated:
+
+\begin{eqnarray}
+\label{eq:2}
+ \tilde{p}(z_n = k|X, \{\mu\}, m_k^{-n}; \alpha, \sigma_0^2) & = & p(x_n|\mu_k;
+\sigma_0^2) \times (\alpha_k + m_k^{-n})   \\
+p(z_n = k | \dots) & = & \frac{\tilde{p}(z_n = k | \dots)}{\sum_l \tilde{p}(z_n = l | \dots)} \\
+where \\
+p(x_n|\mu_k; \sigma_0^2) & = &
+\frac{1}{(2\pi\sigma_0^2)^{\frac{D}{2}}}
+\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D}(x_{n, d} - \mu_{k, d} )^2 \bigg)}  \\
+and \\
+m_k^{-n} & = & |{z_{n'} \in z: z_{n'} = k, n' \neq n} |
+\end{eqnarray}
+
+i.e. $m_k^{ -n }$ is the number of data points assigned to component $k$ excluding data point n.
+
+However, there are situations where ${\sum_l \tilde{p}(z_n = l | \dots)}$ may
+become zero (or very close to). It will result in not able to produce
+$p(z_n = k | \dots)$ required for component assignment sampling.
+
+${\sum_l \tilde{p}(z_n = l | \dots)}$ being zero may be due to the following reasons:
+- Some of the $(x_{n, d} - \mu_{k, d} )^2$ terms are too large, thus too small approaching zero
+  after application of the function $g(y) = \exp(- \frac{1}{2 \sigma_0^2} y)$ having $y = \sum_{d=1}^{D}(x_{n, d} - \mu_{k, d} )^2$
+- With the $D$ increasing, it would compound the above effect of approaching to zero.
+
+Substituting $p(x_n|\mu_k; \sigma_0^2)$ for
+$\tilde{p}(z_n = k|X, \{\mu\}, m_k^{-n}; \alpha, \sigma_0^2)$ then we can rewrite:
+
+\begin{eqnarray}
+\label{eq:3}
+p(z_n = k | \dots) & = & \frac{\tilde{p}(z_n = k | \dots)}{\sum_l \tilde{p}(z_n = l | \dots)} \\
+ & = & \frac{\frac{1}{(2\pi\sigma_0^2)^{\frac{D}{2}}}
+\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D}(x_{n, d} - \mu_{k, d} )^2 \bigg)}}
+{\sum_l {\frac{1}{(2\pi\sigma_0^2)^{\frac{D}{2}}}
+\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D}(x_{l, d} - \mu_{k, d} )^2 \bigg)}}}
+\end{eqnarray}
+
+Removing  the  common  factor $\frac{1}{{(2 \sigma_0^2)}^{\frac{D}{2}}}$  in  both  numerator  and  denominator:
+
+\begin{eqnarray}
+\label{eq:4}
+p(z_n = k | \dots) & = &
+\frac{ \exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D}(x_{n, d} - \mu_{k, d} )^2 \bigg)}}
+{\sum_l {\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D}(x_{n, d} - \mu_{l, d} )^2 \bigg)}}}
+\end{eqnarray}
+
+We can perform the following pre-processing to reduce the likelihood of it approaching zero:
+
+Let
+- $y_{k, n, d} = (x_{n, d} - \mu_{k, d} )^2$
+- $y_{max} = max\{y_{k,n, d}, \   k \in \{1, \dots, K \},  n \in \{1, \dots, N \}, d \in \{1, \dots, D \} \}$
+
+\begin{eqnarray}
+\label{eq:5}
+p(z_n = k | \dots) & = &
+\frac{ \exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D} y_{k,n, d} \bigg)}}
+{\sum_l {\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D} y_{l, n, d} \bigg)}}} \\
+ & = & \frac{ \exp{\bigg( - \frac{1}{2 \sigma_0^2} \big(D \cdot y_{max} + \sum_{d=1}^{D} (y_{k,n, d}-y_{max})\big) \bigg)}}
+{\sum_l {\exp{\bigg( - \frac{1}{2 \sigma_0^2}
+\big(D \cdot y_{max} + \sum_{d=1}^{D} (y_{l,n, d}-y_{max})\big) \bigg)}}} \\
+& = & \frac{\exp{\bigg( - \frac{1}{2 \sigma_0^2} \cdot D \cdot y_{max} \bigg)} \cdot
+\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D} (y_{k,n, d}-y_{max}) \bigg)}}
+{\sum_l \exp{\bigg( - \frac{1}{2 \sigma_0^2} \cdot D \cdot y_{max} \bigg)} \cdot
+{\exp{\bigg( - \frac{1}{2 \sigma_0^2}
+\sum_{d=1}^{D} (y_{l,n, d}-y_{max}) \bigg)}}}
+\end{eqnarray}
+
+Again, removing the common factor $\exp{\bigg( - \frac{1}{2 \sigma_0^2} \cdot D \cdot y_{max} \bigg)}$
+on both the numerator and denominator:
+
+\begin{eqnarray}
+\label{eq:6}
+p(z_n = k | \dots) & = &\frac{
+\exp{\bigg( - \frac{1}{2 \sigma_0^2} \sum_{d=1}^{D} (y_{k,n, d}-y_{max}) \bigg)}}
+{\sum_l
+{\exp{\bigg( - \frac{1}{2 \sigma_0^2}
+\sum_{d=1}^{D} (y_{l,n, d}-y_{max}) \bigg)}}} \\
+& = & \frac{
+\exp{\bigg(\frac{1}{2 \sigma_0^2} \sum_{d=1}^{D} (y_{max}-y_{k,n, d}) \bigg)}}
+{\sum_l
+{\exp{\bigg(\frac{1}{2 \sigma_0^2}
+\sum_{d=1}^{D} (y_{max}-y_{l,n, d}) \bigg)}}}
+\end{eqnarray}
+
+Now, we have $0 \leq (y_{max}-y_{l,n, d}),  \   l \in \{1, \dots, K \},  n \in \{1, \dots, N \}, d \in \{1, \dots, D \}$
+It would not be possible to have the risk of the denominator being zero.
+It's also less likely to have overflow with terms after applying exponent furtion,
+as each $(y_{max}-y_{l,n, d})$ is only the delta of the squared distance between the data points to the mean $m_l$.
+
+But, it still does not guarantee that there will not be overflow with ${\sum_l
+{\exp{\bigg(\frac{1}{2 \sigma_0^2}
+\sum_{d=1}^{D} (y_{max}-y_{l,n, d}) \bigg)}}}$.
+It would be just much less likely so.
+
+It would be another topic to study on how to avoid the overflow problem for the future.
+Similar approach may be used to reduce the common factor in both the numerator and denominator.
+
+The above pre-processing treatment also simplify and reduce the float point calculations.
 
 
 ** setup data
