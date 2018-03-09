@@ -1,0 +1,9 @@
+This project is concerned with the implementation of two different Gibbs samplers for a Gaussian Mixture Model (GMM).
+
+Gibbs samplers are clustering algorithms that assume and exploit the
+distribution assumptions of the clusters (GMM). It thus is more sophisticated than
+K-mean-clustering algorithm. Gibbs samplers are often used in the text
+clustering and summary applications.
+
+For more detailed implementation, please refer to
+[[./gibbs-samplers.org][implementation of Gibbs samplers: a literate programming treatment]]
