@@ -289,7 +289,7 @@ It would be just much less likely so.
 It would be another topic to study on how to avoid the overflow problem for the future.
 Similar approach may be used to reduce the common factor in both the numerator and denominator.
 
-The above pre-processing treatment also simplify and reduce the float point calculations.
+The above pre-processing treatment also simplifies and reduces the float point calculations.
 
 
 ** setup data
